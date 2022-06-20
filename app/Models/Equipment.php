@@ -11,6 +11,8 @@ class Equipment extends Model
 
     public $timestamps = false;
 
+    protected $table = 'equipments';
+
     protected $fillable = [
         'equipment_type_id',
         'serial_number',
@@ -20,5 +22,9 @@ class Equipment extends Model
     // public function getEquipment($request){
     //     DB::s
     // }
+
+    public function equipmentTypes(){
+        return $this->belongsTo(EquipmentType::class);
+    }
 
 }

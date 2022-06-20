@@ -3,9 +3,8 @@
 namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class EquipmentStoreRequest extends FormRequest
+class EquipmentUpdateRequest extends FormRequest
 {
     /**
      * Determine if the user is authorized to make this request.
@@ -25,9 +24,9 @@ class EquipmentStoreRequest extends FormRequest
     public function rules()
     {
         return [
-            'equipments.*.equipment_type_id' => 'required|exists:equipment_types,id',
-            'equipments.*.serial_number' => 'required|unique:equipments',
-            'equipments.*.note' => 'required',
+            'equipment_type_id' => 'required|exists:equipment_types,id',
+            'serial_number' => 'required',
+            'note' => 'required',
         ];
     }
 }

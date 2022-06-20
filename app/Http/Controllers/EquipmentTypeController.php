@@ -5,9 +5,20 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\EquipmentType;
 use App\Http\Resources\EquipmentTypeResource;
+use App\Service\SearchService;
 
 class EquipmentTypeController extends Controller
 {
+
+    /**
+     * Define searchService.
+     * @param App\Service\SearchService  $searchService
+     */
+    public function __construct(SearchService $searchService)
+    {
+        $this->searchService = $searchService;
+    }
+
     /**
      * Display a listing of the resource.
      * @param App\Http\Request  $request
@@ -16,15 +27,9 @@ class EquipmentTypeController extends Controller
     public function index(Request $request)
     {
         $query = EquipmentType::select();
-        if($id = $request->input('id')){
-            $query->where('id', '=', $id);
-        }
-        if($n = $request->input('name')){
-            $query->where('name', 'LIKE', '%'.$n.'%');
-        }
-        if($snm = $request->input('serial_number_mask')){
-            $query->where('serial_number_mask', 'LIKE', '%'.$snm.'%');
-        }
-        return EquipmentTypeResource::collection($query->paginate(5));
+        
+        $queryWithSearch = $this->searchService->makeEquipmentQuery($request,  $query);
+
+        return EquipmentTypeResource::collection($queryWithSearch);
     }
 }

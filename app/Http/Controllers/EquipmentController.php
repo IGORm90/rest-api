@@ -6,12 +6,25 @@ use Illuminate\Http\Request;
 use App\Models\Equipment;
 use App\Models\EquipmentType;
 use App\Http\Resources\EquipmentResource;
+use App\Http\Resources\MaskResource;
 use App\Http\Requests\EquipmentStoreRequest;
+use App\Http\Requests\EquipmentUpdateRequest;
 use Illuminate\Http\Response;
+use App\Service\SearchService;
+use App\Service\MaskService;
 
 class EquipmentController extends Controller
 {
 
+    /**
+     * Define searchService.
+     * @param App\Service\SearchService  $searchService
+     */
+    public function __construct(SearchService $searchService, MaskService $maskService)
+    {
+        $this->searchService = $searchService;
+        $this->maskService = $maskService;
+    }
     
     /**
      * Display a listing of the resource.
@@ -21,24 +34,10 @@ class EquipmentController extends Controller
     public function index(Request $request)
     {
         $query = Equipment::select();
-        if($id = $request->input('id')){
-            $query->where('id', '=', $id);
-        }
-        //поиск по серийному номеру/примечанию
-        if($t = $request->input('input_text')){
-            $query->where('serial_number', 'LIKE', '%'.$t.'%');
-            $query->orWhere('note', 'LIKE', '%'.$t.'%');
-        }
-        if($t = $request->input('equipment_type_id')){
-            $query->where('equipment_type_id', '=', $t);
-        }
-        if($sn = $request->input('serial_number')){
-            $query->where('serial_number', 'LIKE', '%'.$sn.'%');
-        }
-        if($n = $request->input('note')){
-            $query->where('note', 'LIKE', '%'.$n.'%');
-        }
-        return EquipmentResource::collection($query->paginate(5));
+        
+        $queryWithSearch = $this->searchService->makeEquipmentQuery($request,  $query);
+
+        return EquipmentResource::collection($queryWithSearch);
     }
 
     /**
@@ -59,15 +58,20 @@ class EquipmentController extends Controller
      */
     public function store(EquipmentStoreRequest $request)
     {
-        $requestData = $request->all();
 
-        $equipmentTypeMask = EquipmentType::find($requestData['equipment_type_id'])->serial_number_mask;
-        if(!$this->validateSerialNumber($equipmentTypeMask, $requestData['serial_number'])){
-            return response()->json([
-                'message' => 'Serial Number ' . $requestData['serial_number'] . ' is incorrect!'], 422);
+        $uncreatedEquipments = [];
+
+        foreach($request->equipments as $equipment){    
+            if($this->maskService->validateSerialNumber($equipment['equipment_type_id'], $equipment['serial_number'])){
+                $createdEquipment = Equipment::create($equipment);
+            } else {
+                $uncreatedEquipments[] = $equipment;
+            }        
         }
-        
-        $createdEquipment = Equipment::create($request->validated());
+
+        if($uncreatedEquipments){
+            return new MaskResource($uncreatedEquipments);
+        }
     
         return new EquipmentResource($createdEquipment);
     }
@@ -97,21 +101,17 @@ class EquipmentController extends Controller
     /**
      * Update the specified resource in storage.
      *
-     * @param  \Illuminate\Http\Request  $request
+     * @param  \Illuminate\Http\EquipmentUpdateRequest  $request
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(EquipmentStoreRequest $request, Equipment $equipment)
+    public function update(EquipmentUpdateRequest $request, Equipment $equipment)
     {
         $requestData = $request->all();
 
-        $equipmentTypeMask = EquipmentType::find($requestData['equipment_type_id'])->serial_number_mask;
-        if(!$this->validateSerialNumber($equipmentTypeMask, $requestData['serial_number'])){
-            return response()->json([
-                'message' => 'Serial Number ' . $requestData['serial_number'] . ' is incorrect!'], 422);
-        }
-
-        $equipment->update($request->validated());
+        if($this->maskService->validateSerialNumber($requestData['equipment_type_id'], $requestData['serial_number'])){
+            $equipment->update($request->validated());
+        }  
 
         return new EquipmentResource($equipment);
     }
@@ -129,32 +129,4 @@ class EquipmentController extends Controller
         return response(null, Response::HTTP_NO_CONTENT);
     }
 
-    /**
-     * Validate Serial Number by mask.
-     *
-     * @param  string  $mask
-     * @param  string  $serialNumber
-     * @return bool $isValid
-     */
-    public function validateSerialNumber(string $mask, string $serialNumber): bool {
-
-        $maskToRegExp = [
-            'N' => '[0-9]',
-            'A' => '[A-Z]',
-            'a' => '[a-z]',
-            'X' => '[a-z0-9]',
-            'Z' => '[-_@]',
-        ];
-        $pregString = '/';
-        $maskArray = str_split($mask);
-        foreach($maskArray as $ma){
-            if(isset($maskToRegExp[$ma])){
-                $pregString .= $maskToRegExp[$ma];
-            } else {
-                return false;
-            }
-        }
-        $pregString .= '/';
-        return boolval(preg_match($pregString, $serialNumber));
-    }
 }

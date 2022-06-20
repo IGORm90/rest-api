@@ -19,5 +19,7 @@ use App\Http\Controllers\EquipmentTypeController;
 //     return $request->user();
 // });
 
-Route::resource('/equipment', EquipmentController::class)->middleware('auth:api');
+Route::resource('/equipment', EquipmentController::class, [
+    'only' => ['index', 'store', 'show', 'update', 'destroy']
+])->middleware('auth:api');
 Route::get('/equipment-type', [EquipmentTypeController::class, 'index'])->middleware('auth:api');
